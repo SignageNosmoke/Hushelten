@@ -65,6 +65,7 @@ function startFamily() {
     S.data = d;
     if (!isAdult() && !store.demo && d.children[S.profile.childId] && !d.children[S.profile.childId].joined && !S.joinSent) { S.joinSent = true; store.saveChild(S.profile.familyId, S.profile.childId, { joined: true }).catch(() => {}); }
     if (first || !S.tab) S.tab = isAdult() ? 'a-home' : 'home';
+    if (first && !isAdult() && S.user && !get('hushelt-help-' + S.user.uid)) { put('hushelt-help-' + S.user.uid, '1'); S.help = true; }
     S.view = 'app';
     softRender();
     checkCelebrate();
@@ -138,10 +139,34 @@ function shell() {
   return (store.demo ? '<div class="demo-banner">Demo-modus: data lagres bare i denne nettleseren. Se README for å koble til Firebase.</div>' : '') +
     '<header><div class="logo">Hus<span>Helt</span></div><div class="hbtns">' +
     (store.demo ? '<button class="modebtn" data-a="demorole">Vis som ' + (adult ? 'barn' : 'forelder') + '</button>' : '') +
+    '<button class="bellbtn" data-a="help" aria-label="Slik fungerer det" style="font-weight:800">?</button>' +
     '<button class="bellbtn" data-a="inbox" aria-label="Varsler">' + ico('bell') + (n ? '<span class="badge">' + n + '</span>' : '') + '</button></div></header>' +
     '<main id="main">' + body + '</main>' +
     '<nav>' + tabs.map(t => '<button data-a="tab" data-v="' + t[0] + '" class="' + (S.tab === t[0] ? 'on' : '') + '">' + ico(t[1]) + t[2] + (t[0] === 'a-home' && pend ? '<span class="badge">' + pend + '</span>' : '') + '</button>').join('') + '</nav>' +
-    (S.sheet ? sheetView() : '') + (S.ov ? '<div class="overlay"><canvas id="cv"></canvas><div class="ovb">' + S.ov + '</div></div>' : '');
+    (S.sheet ? sheetView() : '') + (S.help ? helpView() : '') + (S.ov ? '<div class="overlay"><canvas id="cv"></canvas><div class="ovb">' + S.ov + '</div></div>' : '');
+}
+
+
+function helpView() {
+  const t = (a, b) => '<div class="notif"><div><b>' + a + '</b></div><div class="st" style="margin-top:2px">' + b + '</div></div>';
+  const body = isAdult() ?
+    t('Hver dag', 'Åpne Kontroll. Godkjenn eller send tilbake det barnet har meldt som ferdig. Godkjenn bare når det faktisk er gjort.') +
+    t('Quests', 'Her legger du inn oppgaver. Tommelfingerregel: 10 minutter er 10 XP. Storjobb er den store oppgaven som vises øverst hos barnet.') +
+    t('kr, XP og mynter', 'kr er ekte penger dere betaler ut. XP gir barnet høyere nivå. Mynter kjøper utseende i appen. Bare kr har med lommebok å gjøre.') +
+    t('Lønn', 'Viser hva barnet har til gode. Betal selv (for eksempel Vipps) og trykk «Utbetalt».') +
+    t('Feil godkjenning?', 'Trykk Angre under Lønn, så trekkes kr og XP tilbake.') +
+    t('Familie', 'Koder til barn og andre voksne, delt bosted, ukemål og langtidsmål, for eksempel en tur.') +
+    t('Varsler', 'De vises når appen åpnes. Appen sender ikke push til lukket telefon.') :
+    t('Slik gjør du en quest', 'Trykk Ta quest, gjør jobben, trykk Ferdig. Mamma eller pappa godkjenner, og så får du belønningen.') +
+    t('kr', 'Ekte penger du får utbetalt. De står under «Til gode».') +
+    t('XP', 'Poeng som gir deg høyere nivå. De er ikke penger.') +
+    t('Mynter', 'Du får mynter for hver godkjente quest. Bruk dem i Meg-fanen til å kjøpe ting til avataren, for eksempel nye hårfarger.') +
+    t('Kister', 'Du får en kiste for hver 3. godkjente quest. Åpne dem i Loot-fanen.') +
+    t('Dager på rad', 'Øker for hver dag du får noe godkjent. Hver 7. dag får du et skjold som redder rekken hvis du hopper over en dag.') +
+    t('Storjobb', 'Den største oppgaven akkurat nå, og den gir mest.') +
+    t('Ukens mål', 'Nå antallet quests for uka, så får du en ekstra kiste.') +
+    t('Det store målet', 'Et langt mål med en belønning. Det fylles opp av XP og av at du holder koken uke etter uke.');
+  return '<div class="overlay sheet" data-a="closehelp"><div class="ovb" data-stop="1"><div class="row"><h1 class="grow" style="font-size:22px">Slik fungerer det</h1><button class="btn sm ghost" data-a="closehelp">Lukk</button></div>' + body + '</div></div>';
 }
 
 function sheetView() {
@@ -189,22 +214,24 @@ function goalBlock(c, adult) {
 }
 function goalEditor(c) {
   const g = c.goal, pot = L.weeklyPotential(S.data.quests.filter(q => q.childId === c.id));
-  if (!g) return '<div class="st" style="margin-top:12px">Langtidsmål (for eksempel en sydentur)</div><button class="btn sm ghost" style="margin-top:6px" data-a="goalnew" data-c="' + c.id + '">Lag langtidsmål</button>';
-  const v = L.goalView(g), id = c.id, hd = L.goalHardness(g, pot);
+  if (!g) return '<div class="st" style="margin-top:12px">Langtidsmål (for eksempel en tur som krever mye av barnet)</div><button class="btn sm ghost" style="margin-top:6px" data-a="goalnew" data-c="' + c.id + '">Lag langtidsmål</button>';
+  const v = L.goalView(g), id = c.id, hd = L.goalHardness(g, pot), adv = !!(S.adv && S.adv[id]);
   const inp = (f, label, val, ex) => '<label class="field"><span>' + label + '</span><input data-f="' + f + '" data-c="' + id + '" value="' + esc(val) + '"' + (ex || '') + '></label>';
   let h = '<div class="st" style="margin-top:14px"><b>Langtidsmål</b></div>' +
     inp('gTitle', 'Navn', g.title, ' maxlength="30"') + inp('gPrize', 'Belønning', g.prize, ' maxlength="40"') +
-    '<div class="two"><label class="field"><span>XP som kreves</span><input type="number" min="100" step="100" data-f="gTarget" data-c="' + id + '" value="' + g.target + '"></label>' +
-    '<label class="field"><span>Frist (valgfri)</span><input type="date" data-f="gEnd" data-c="' + id + '" value="' + esc(g.end || '') + '"></label></div>' +
-    '<label class="field"><span>Uker der ukemålet må nås (0 = ikke krav)</span><input type="number" min="0" max="104" data-f="gNeed" data-c="' + id + '" value="' + (g.need || 0) + '"></label>' +
-    '<div class="st" style="margin-bottom:6px">Sett kravet som andel av maks mulig innsats:</div><div class="seg" style="margin-bottom:10px">' + [60, 70, 80, 90].map(n => '<button data-a="goalpct" data-c="' + id + '" data-v="' + n + '">' + n + ' %</button>').join('') + '</div>' +
-    (hd ? '<div class="st" style="margin-bottom:8px"><b>Hvor strengt er dette?</b> ' + (hd.pct != null ? hd.label + ' (' + hd.pct + ' % av maks mulig XP til fristen). ' : '') + 'Det tilsvarer ' + hd.weeksFull + ' uker der alle quests gjøres. ' + (hd.pct != null && hd.pct <= 40 ? 'Dette er lett å nå. Øk kravet hvis belønningen er stor.' : '') + '</div>' : '<div class="st" style="margin-bottom:8px">Legg inn quests først, så viser appen hvor strengt kravet er.</div>') +
-    '<div class="st" style="margin-bottom:8px">Appen kontrollerer ikke selve oppgaven. Det gjør du når du godkjenner, så godkjenn bare når det faktisk er gjort.</div>' +
-    '<div class="st">Fremdrift: ' + (g.xp || 0) + ' av ' + g.target + ' XP (' + v.pct + ' %). XP teller fra ' + esc(g.start || '') + '.' + (pot ? ' Hvis alle quests til ' + esc(c.name) + ' gjøres hver uke, gir det ca. ' + pot + ' XP per uke.' : '') + (v.perWeek != null && !g.reached ? ' For å nå målet innen fristen trengs ca. ' + v.perWeek + ' XP per uke.' : '') + '</div>' +
-    '<div class="two" style="margin-top:10px"><button class="btn sm ghost" style="width:100%" data-a="goalreset" data-c="' + id + '">' + (S.confirm === 'greset:' + id ? 'Trykk igjen for å nullstille' : 'Nullstill fremdrift') + '</button><button class="btn sm ghost" style="width:100%" data-a="goaldel" data-c="' + id + '">' + (S.confirm === 'gdel:' + id ? 'Trykk igjen for å slette' : 'Slett mål') + '</button></div>';
+    '<div class="st" style="margin-bottom:6px">Hvor strengt skal det være?</div><div class="seg" style="margin-bottom:10px">' + [[50, 'Lett'], [65, 'Middels'], [80, 'Krevende'], [90, 'Svært krevende']].map(x => '<button data-a="goalpct" data-c="' + id + '" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div>' +
+    (hd ? '<div class="st" style="margin-bottom:8px">Akkurat nå: <b>' + (hd.pct != null ? hd.label : '') + '</b>' + (hd.pct != null ? ' (' + hd.pct + ' % av det barnet maksimalt kan tjene til fristen)' : '') + '. Det tilsvarer ca. ' + hd.weeksFull + ' uker der alle quests gjøres.' + (hd.pct != null && hd.pct <= 40 ? ' Det er lett å nå. Øk kravet hvis belønningen er stor.' : '') + '</div>' : '<div class="st" style="margin-bottom:8px">Legg inn quests først, så viser appen hvor strengt kravet er.</div>') +
+    '<div class="st" style="margin-bottom:8px">Fremdrift: ' + v.pct + ' %. Appen kontrollerer ikke selve oppgaven. Det gjør du når du godkjenner.</div>' +
+    '<button class="btn sm ghost" style="margin-bottom:8px" data-a="goaladv" data-c="' + id + '">' + (adv ? 'Skjul avanserte valg' : 'Avanserte valg') + '</button>';
+  if (adv) {
+    h += '<div class="two"><label class="field"><span>XP som kreves</span><input type="number" min="100" step="100" data-f="gTarget" data-c="' + id + '" value="' + g.target + '"></label>' +
+      '<label class="field"><span>Frist (valgfri)</span><input type="date" data-f="gEnd" data-c="' + id + '" value="' + esc(g.end || '') + '"></label></div>' +
+      '<label class="field"><span>Uker der ukemålet må nås (0 = ikke krav)</span><input type="number" min="0" max="104" data-f="gNeed" data-c="' + id + '" value="' + (g.need || 0) + '"></label>' +
+      '<div class="st">XP-status: ' + (g.xp || 0) + ' av ' + g.target + '. XP teller fra ' + esc(g.start || '') + '.' + (pot ? ' Alle quests hver uke gir ca. ' + pot + ' XP per uke.' : '') + (v.perWeek != null && !g.reached ? ' For å nå målet innen fristen trengs ca. ' + v.perWeek + ' XP per uke.' : '') + '</div>' +
+      '<div class="two" style="margin-top:10px"><button class="btn sm ghost" style="width:100%" data-a="goalreset" data-c="' + id + '">' + (S.confirm === 'greset:' + id ? 'Trykk igjen for å nullstille' : 'Nullstill fremdrift') + '</button><button class="btn sm ghost" style="width:100%" data-a="goaldel" data-c="' + id + '">' + (S.confirm === 'gdel:' + id ? 'Trykk igjen for å slette' : 'Slett mål') + '</button></div>';
+  }
   return h;
 }
-
 function kHome() {
   const c = myChild();
   if (!c) return '<div class="empty">Fant ikke profilen din. Be en forelder sjekke at koden din er riktig.</div>';
@@ -216,13 +243,13 @@ function kHome() {
   const doy = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 864e5);
   let h = profileCard(c) + (S.profile && S.data.children[S.profile.childId] && !c.avDone && c.inv.length <= 3 && !c.coins ? '' : '') +
     '<div class="chips"><div class="chip"><div class="l">' + ico('coin') + 'Til gode</div><div class="v" style="color:var(--money)">' + owed + ' kr</div></div>' +
-    '<div class="chip"><div class="l">' + ico('flame') + 'Streak</div><div class="v">' + c.streak + ' d</div></div>' +
-    '<div class="chip"><div class="l">' + ico('gift') + 'Neste kiste</div><div class="v">' + (c.approved % 3) + '/3</div></div></div>' +
+    '<div class="chip"><div class="l">' + ico('flame') + 'Dager på rad</div><div class="v">' + c.streak + '</div></div>' +
+    '<div class="chip"><div class="l">' + ico('gift') + 'Til neste kiste</div><div class="v">' + (c.approved % 3) + ' av 3</div></div></div>' +
     '<div class="mom"><div class="av">' + (msg ? esc(msg.from.charAt(0).toUpperCase()) : 'M') + '</div><div class="bubble">' + esc(msg ? msg.text : NPC[doy % NPC.length]) + '</div></div>';
   if (splitOn()) h += '<div class="st" style="margin-top:12px">Denne uka: ' + esc(homeName(curHome())) + '</div>';
-  if (boss) h += '<h2>Dagens boss</h2><div class="hero"><div class="tag">Mest XP akkurat nå</div><div class="ht">' + esc(boss.title) + '</div><div class="rw" style="margin-bottom:14px"><span class="kr">+' + boss.kr + ' kr</span><span class="xp">+' + boss.xp + ' XP</span></div>' + (L.qState(boss) === 'taken' ? '<button class="btn ok" data-a="done" data-id="' + boss.id + '">Ferdig</button>' : '<button class="btn" data-a="take" data-id="' + boss.id + '">Ta bossen</button>') + '</div>';
-  if (free.length) h += '<h2>Raske XP</h2>' + free.map(q => qcard(q)).join('');
-  if (c.goal && c.goal.on) h += '<h2>Årsmål</h2>' + goalBlock(c, false);
+  if (boss) h += '<h2>Dagens storjobb</h2><div class="hero"><div class="tag">Størst jobb akkurat nå</div><div class="ht">' + esc(boss.title) + '</div><div class="rw" style="margin-bottom:14px"><span class="kr">+' + boss.kr + ' kr</span><span class="xp">+' + boss.xp + ' XP</span></div>' + (L.qState(boss) === 'taken' ? '<button class="btn ok" data-a="done" data-id="' + boss.id + '">Ferdig</button>' : '<button class="btn" data-a="take" data-id="' + boss.id + '">Ta storjobben</button>') + '</div>';
+  if (free.length) h += '<h2>Raske jobber</h2>' + free.map(q => qcard(q)).join('');
+  if (c.goal && c.goal.on) h += '<h2>Det store målet</h2>' + goalBlock(c, false);
   h += '<h2>Ukens mål</h2><div class="card"><div class="row"><div class="grow">' + w.done + ' av ' + c.weekGoal + ' quests</div><div class="st">Mål nådd = ekstra kiste</div></div><div class="bar2"><i style="width:' + Math.min(100, w.done / c.weekGoal * 100) + '%"></i></div></div>';
   return h;
 }
@@ -294,7 +321,7 @@ function aQuests() {
   let h = '<h2>Quests</h2><button class="btn" data-a="newquest">Ny quest</button>';
   ks.forEach(c => {
     const qs = S.data.quests.filter(q => q.childId === c.id);
-    h += '<h2>' + esc(c.name) + '</h2>' + (qs.length ? qs.map(q => '<div class="q"><div class="ico">' + ico(q.ic) + '</div><div class="grow"><div class="t">' + esc(q.title) + (q.boss ? ' · boss' : '') + '</div><div class="st">' + q.rep + ' · ' + q.kr + ' kr · ' + q.xp + ' XP' + (splitOn() && q.home && q.home !== 'both' ? ' · ' + esc(homeName(q.home)) : '') + '</div></div>' +
+    h += '<h2>' + esc(c.name) + '</h2>' + (qs.length ? qs.map(q => '<div class="q"><div class="ico">' + ico(q.ic) + '</div><div class="grow"><div class="t">' + esc(q.title) + (q.boss ? ' · storjobb' : '') + '</div><div class="st">' + q.rep + ' · ' + q.kr + ' kr · ' + q.xp + ' XP' + (splitOn() && q.home && q.home !== 'both' ? ' · ' + esc(homeName(q.home)) : '') + '</div></div>' +
       '<button class="btn sm ghost" data-a="editquest" data-id="' + q.id + '" aria-label="Rediger ' + esc(q.title) + '">Endre</button>' +
       (S.confirm === 'del:' + q.id ? '<button class="btn sm danger" data-a="delquest" data-id="' + q.id + '">Sikker?</button>' : '<button class="btn sm ghost" data-a="delquest" data-id="' + q.id + '" aria-label="Slett ' + esc(q.title) + '">' + ico('trash') + '</button>') + '</div>').join('') : '<div class="empty">Ingen quests ennå.</div><button class="btn ghost" data-a="pack" data-c="' + c.id + '">Legg inn forslagspakke (7 vanlige quests)</button>');
   });
@@ -311,7 +338,7 @@ function questForm() {
     (f.id ? '' : '<label class="field"><span>Til</span><select id="q-child">' + (ks.length > 1 ? '<option value="all">Alle barn</option>' : '') + ks.map(c => '<option value="' + c.id + '"' + (f.childId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></label>') +
     (splitOn() ? '<label class="field"><span>Hvilket hjem</span><select id="q-home"><option value="both"' + (f.home === 'both' ? ' selected' : '') + '>Begge</option><option value="a"' + (f.home === 'a' ? ' selected' : '') + '>' + esc(homeName('a')) + '</option><option value="b"' + (f.home === 'b' ? ' selected' : '') + '>' + esc(homeName('b')) + '</option></select></label>' : '') +
     '<label class="field"><span>Ikon</span><select id="q-ic">' + QUEST_ICONS.map(i => '<option value="' + i[0] + '"' + (f.ic === i[0] ? ' selected' : '') + '>' + i[1] + '</option>').join('') + '</select></label>' +
-    '<label class="check"><input id="q-boss" type="checkbox"' + (f.boss ? ' checked' : '') + '> Boss (vises øverst på barnets side)</label>' +
+    '<label class="check"><input id="q-boss" type="checkbox"' + (f.boss ? ' checked' : '') + '> Storjobb (vises stort øverst på barnets side)</label>' +
     '<div class="two"><button class="btn ghost" data-a="cancelform">Avbryt</button><button class="btn" data-a="savequest">Lagre</button></div></div>';
 }
 function aPay() {
@@ -381,7 +408,7 @@ function setAvatar(patch) { const c = myChild(); return store.saveChild(fid(), c
 
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-a]'); if (!el) return;
-  if (el.dataset.a === 'closesheet' && e.target.closest('[data-stop]') && el.classList.contains('overlay')) return;
+  if ((el.dataset.a === 'closesheet' || el.dataset.a === 'closehelp') && e.target.closest('[data-stop]') && el.classList.contains('overlay')) return;
   act(el.dataset.a, el, e);
 });
 document.addEventListener('submit', e => { e.preventDefault(); const id = e.target.id; if (id === 'authform') doAuth(); else if (id === 'kidform') doKid(); else if (id === 'createform') doCreate(); else if (id === 'joinform') doJoin(); else if (id === 'childform') doAddChild(); });
@@ -464,6 +491,9 @@ async function act(a, el, ev) {
     case 'cat': S.cat = v; render(); break;
     case 'inbox': S.sheet = true; S.prevSeen = S.profile.seenAt || 0; S.profile.seenAt = Date.now(); store.setProfile(S.user.uid, { seenAt: S.profile.seenAt }).catch(() => {}); render(); break;
     case 'closesheet': S.sheet = false; render(); break;
+    case 'help': S.help = true; render(); break;
+    case 'closehelp': S.help = false; render(); break;
+    case 'goaladv': S.adv = S.adv || {}; S.adv[el.dataset.c] = !S.adv[el.dataset.c]; render(); break;
     case 'closeov': S.ov = null; cancelAnimationFrame(raf); render(); checkCelebrate(); break;
     case 'demorole': { const r = isAdult() ? 'child' : 'adult'; store.setDemoRole(r); S.profile = await store.getProfile(); S.tab = r === 'adult' ? 'a-home' : 'home'; render(); break; }
     case 'resetdemo': store.resetDemo(); S.profile = await store.getProfile(); S.tab = 'a-home'; render(); break;
@@ -512,7 +542,7 @@ async function act(a, el, ev) {
     case 'share': { const c = S.data.children[el.dataset.c], url = location.href.split('#')[0].split('?')[0], txt = 'Hei ' + c.name + '! Åpne ' + url + ' , trykk «Jeg er barn og har en kode», skriv inn koden ' + c.code + ' og velg et passord.'; try { if (navigator.share) { await navigator.share({ text: txt }); break; } await navigator.clipboard.writeText(txt); toast('Invitasjonen er kopiert'); } catch (e) { /* avbrutt */ } break; }
     case 'newcode': await run(async () => { const code = await store.newChildCode(F, el.dataset.c); toast('Ny kode: ' + code); }); break;
     case 'pack': await run(async () => { for (const t of L.TEMPLATES.slice(0, 7)) await store.saveQuest(F, { title: t.title, ic: t.ic, kr: t.kr, xp: t.xp, rep: t.rep, boss: !!t.boss, childId: el.dataset.c, home: 'both' }); }, 'Quests lagt til'); break;
-    case 'goalpct': { const cid = el.dataset.c, c = S.data.children[cid], pot = L.weeklyPotential(S.data.quests.filter(q => q.childId === cid)); if (!pot) { toast('Legg inn quests først'); break; } const sg = L.goalSuggest(pot, c.goal.start, c.goal.end, +v); const g = Object.assign({}, c.goal, { target: sg.target, need: sg.need }); g.reached = L.goalPct(g) >= 100; await run(() => store.saveChild(F, cid, { goal: g }), 'Kravet er satt til ' + v + ' % av maks'); break; }
+    case 'goalpct': { const cid = el.dataset.c, c = S.data.children[cid], pot = L.weeklyPotential(S.data.quests.filter(q => q.childId === cid)); if (!pot) { toast('Legg inn quests først'); break; } const sg = L.goalSuggest(pot, c.goal.start, c.goal.end, +v); const g = Object.assign({}, c.goal, { target: sg.target, need: sg.need }); g.reached = L.goalPct(g) >= 100; await run(() => store.saveChild(F, cid, { goal: g }), 'Kravet er oppdatert'); break; }
     case 'goalnew': { const t = L.today(), cid = el.dataset.c, end = L.addDays(t, 365), pot = L.weeklyPotential(S.data.quests.filter(q => q.childId === cid)), sg = pot ? L.goalSuggest(pot, t, end, 80) : { target: 20000, need: 40 }; await run(() => store.saveChild(F, cid, { goal: { on: true, title: 'Sydentur', prize: 'Tur til syden', target: sg.target, need: sg.need, pw: 0, xp: 0, start: t, end, reached: false, reachedAt: '' } }), 'Mål opprettet. Kravet er satt til 80 % av maks.'); break; }
     case 'goalreset': { const cid = el.dataset.c; if (S.confirm === 'greset:' + cid) { S.confirm = null; const g = Object.assign({}, S.data.children[cid].goal, { xp: 0, pw: 0, reached: false, reachedAt: '', start: L.today() }); await run(() => store.saveChild(F, cid, { goal: g }), 'Fremdrift nullstilt'); } else { S.confirm = 'greset:' + cid; render(); } break; }
     case 'goaldel': { const cid = el.dataset.c; if (S.confirm === 'gdel:' + cid) { S.confirm = null; await run(() => store.saveChild(F, cid, { goal: null }), 'Mål slettet'); } else { S.confirm = 'gdel:' + cid; render(); } break; }
