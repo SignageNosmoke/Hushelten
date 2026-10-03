@@ -1,6 +1,6 @@
-# HusHelt – oppsett (tar ca. 20 minutter, koster 0 kr)
+# Slitsomt – oppsett (tar ca. 20 minutter, koster 0 kr)
 
-HusHelt er en ren nettside (PWA) uten byggesteg. Den trenger bare:
+Slitsomt er en ren nettside (PWA) uten byggesteg. Den trenger bare:
 1. et **eget** Firebase-prosjekt (gratisplanen Spark) til innlogging og lagring
 2. GitHub Pages til å vise nettsiden
 

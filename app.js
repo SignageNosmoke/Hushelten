@@ -83,7 +83,7 @@ function render() {
   root.innerHTML = shell();
   const m = $('#main'); if (m) m.scrollTop = top;
   const n = unread();
-  document.title = (n ? '(' + n + ') ' : '') + 'HusHelt';
+  document.title = (n ? '(' + n + ') ' : '') + 'Slitsomt';
   try { if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()); } catch (e) { /* valgfritt */ }
   if (S.ov) startConfetti();
 }
@@ -94,7 +94,7 @@ function authView() {
   const m = S.authMode;
   if (m === 'kid-up' || m === 'kid-in') {
     const up = m === 'kid-up';
-    return '<div class="authbox"><h1>Hus<span style="color:var(--xp)">Helt</span></h1><div class="st" style="margin-bottom:22px">' + (up ? 'Første gang? Skriv inn koden du har fått av mamma eller pappa, og velg et passord.' : 'Logg inn med koden din og passordet ditt.') + '</div>' +
+    return '<div class="authbox"><h1>Slit<span style="color:var(--xp)">somt</span></h1><div class="st" style="margin-bottom:22px">' + (up ? 'Første gang? Skriv inn koden du har fått av mamma eller pappa, og velg et passord.' : 'Logg inn med koden din og passordet ditt.') + '</div>' +
       '<form id="kidform"><label class="field"><span>Koden din (for eksempel K7M2-9XQA)</span><input id="k-code" required maxlength="9" autocapitalize="characters" autocomplete="off"></label>' +
       '<label class="field"><span>Passord' + (up ? ' (minst 6 tegn)' : '') + '</span><input id="k-pw" type="password" autocomplete="' + (up ? 'new-password' : 'current-password') + '" required minlength="6"></label>' +
       (up ? '<div class="st" style="margin:-4px 0 12px">Husk passordet. Mangler du det senere, kan en forelder lage en ny kode til deg.</div>' : '') +
@@ -103,7 +103,7 @@ function authView() {
       '<div style="margin-top:14px;display:flex;flex-direction:column;gap:2px">' + (up ? '<button class="link" data-a="authmode" data-v="kid-in">Har du vært her før? Logg inn</button>' : '<button class="link" data-a="authmode" data-v="kid-up">Første gang? Bruk koden din</button>') + '<button class="link" data-a="authmode" data-v="in">Jeg er forelder</button></div></div>';
   }
   const up = m === 'up', rs = m === 'reset';
-  return '<div class="authbox"><h1>Hus<span style="color:var(--xp)">Helt</span></h1><div class="st" style="margin-bottom:22px">Husarbeid som spill, for hele familien.</div>' +
+  return '<div class="authbox"><h1>Slit<span style="color:var(--xp)">somt</span></h1><div class="st" style="margin-bottom:22px">Husarbeid er slitsomt. Dette gjør det litt mindre.</div>' +
     '<form id="authform"><label class="field"><span>E-post</span><input id="a-email" type="email" autocomplete="email" required></label>' +
     (rs ? '' : '<label class="field"><span>Passord' + (up ? ' (minst 6 tegn)' : '') + '</span><input id="a-pw" type="password" autocomplete="' + (up ? 'new-password' : 'current-password') + '" required minlength="6"></label>') +
     (S.err ? '<div class="err" role="alert">' + esc(S.err) + '</div>' : '') +
@@ -137,7 +137,7 @@ function shell() {
   let body;
   try { body = (views[S.tab] || (adult ? aHome : kHome))(); } catch (e) { console.error(e); body = '<div class="empty">Noe gikk galt i visningen. Last siden på nytt.</div>'; }
   return (store.demo ? '<div class="demo-banner">Demo-modus: data lagres bare i denne nettleseren. Se README for å koble til Firebase.</div>' : '') +
-    '<header><div class="logo">Hus<span>Helt</span></div><div class="hbtns">' +
+    '<header><div class="logo">Slit<span>somt</span></div><div class="hbtns">' +
     (store.demo ? '<button class="modebtn" data-a="demorole">Vis som ' + (adult ? 'barn' : 'forelder') + '</button>' : '') +
     '<button class="bellbtn" data-a="help" aria-label="Slik fungerer det" style="font-weight:800">?</button>' +
     '<button class="bellbtn" data-a="inbox" aria-label="Varsler">' + ico('bell') + (n ? '<span class="badge">' + n + '</span>' : '') + '</button></div></header>' +

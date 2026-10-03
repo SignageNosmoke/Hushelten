@@ -1,5 +1,5 @@
 rules_version = '2';
-// HusHelt – sikkerhetsregler for Firestore.
+// Slitsomt – sikkerhetsregler for Firestore.
 // Lim inn i Firebase-konsollen: Firestore Database → Regler → Publiser.
 service cloud.firestore {
   match /databases/{database}/documents {
