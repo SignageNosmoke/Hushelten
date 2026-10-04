@@ -91,11 +91,12 @@ export function createFirebaseStore(cfg) {
         if (L.qState(q) !== 'wait') throw new Error('not-waiting');
         const cref = doc(C(fid, 'children'), q.childId), cs = await tx.get(cref);
         const s = L.today();
-        const r = L.approve(cs.data(), q, s, who.home);
+        const pr = L.priced(q, who.cnt, who.kr);
+        const r = L.approve(cs.data(), Object.assign({}, q, { kr: pr.kr, xp: pr.xp }), s, who.home);
         tx.update(cref, clean(r.child));
         tx.update(qref, { st: 'done', doneKey: L.cycleKey(q.rep, s) });
-        tx.set(doc(C(fid, 'ledger')), clean({ at: Date.now(), type: 'quest', childId: q.childId, childName: cs.data().name, title: q.title, kr: q.kr, xp: q.xp, home: who.home, wk: r.info.wk, di: r.info.di, g: r.info.g, pf: r.info.pf, by: who.name, undone: false, qid }));
-        tx.set(doc(C(fid, 'notifs')), clean({ at: Date.now(), type: 'approved', to: q.childId, from: who.name, text: q.title, payload: r.info }));
+        tx.set(doc(C(fid, 'ledger')), clean({ at: Date.now(), type: 'quest', childId: q.childId, childName: cs.data().name, title: pr.title, kr: pr.kr, xp: pr.xp, home: who.home, wk: r.info.wk, di: r.info.di, g: r.info.g, pf: r.info.pf, by: who.name, undone: false, qid }));
+        tx.set(doc(C(fid, 'notifs')), clean({ at: Date.now(), type: 'approved', to: q.childId, from: who.name, text: pr.title, payload: r.info }));
         if (r.info.goalHit) {
           const gt = (cs.data().goal && cs.data().goal.prize) || 'målet';
           tx.set(doc(C(fid, 'notifs')), clean({ at: Date.now() + 1, type: 'msg', to: 'adults', from: cs.data().name, text: cs.data().name + ' har nådd målet: ' + gt }));

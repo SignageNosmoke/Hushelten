@@ -1,6 +1,7 @@
 // Ren logikk uten DOM og uten Firebase. Brukes av begge lagringsløsningene og kan testes i node.
 import { ITEMS } from './avatar.js';
 
+export function r2(n) { return Math.round((+n || 0) * 100) / 100; }
 export function pad(n) { return String(n).padStart(2, '0'); }
 export function today(d) { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
 function parse(s) { var p = s.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2], 12); }
@@ -101,6 +102,15 @@ export function weekView(c, s) {
   return c.weekKey === mondayOf(s || today()) ? { arr: c.weekArr, done: c.weekDone } : { arr: [0, 0, 0, 0, 0, 0, 0], done: 0 };
 }
 
+// Hva en godkjenning gir. Vanlig quest: fast pris (forelder kan overstyre kr). Per stykk: pris og XP ganges med antall.
+export function priced(q, cnt, krOverride) {
+  var n = 1, kr = q.kr, xp = q.xp;
+  if (q.unit) {
+    n = Math.max(1, Math.min(500, Math.round(+cnt || +q.cnt || 1)));
+    kr = r2(q.kr * n); xp = q.xp > 0 ? Math.max(1, Math.round(q.xp * n)) : 0;
+  } else if (krOverride != null && isFinite(krOverride)) kr = r2(Math.max(0, krOverride));
+  return { kr: kr, xp: xp, n: n, title: q.unit ? q.title + ' (' + n + ' ' + q.unit + ')' : q.title };
+}
 export function approve(child, quest, s, home) {
   var c = JSON.parse(JSON.stringify(child));
   var wk = mondayOf(s), di = dayIdx(s);
@@ -128,8 +138,8 @@ export function approve(child, quest, s, home) {
   if (perfect) chests.push('Lucky Chest');
   c.chests = c.chests.concat(chests);
   c.coins += Math.ceil(quest.xp / 2) + (after > before ? 25 * (after - before) : 0);
-  c.owed[home] = (c.owed[home] || 0) + quest.kr;
-  c.earnedTotal += quest.kr;
+  c.owed[home] = r2((c.owed[home] || 0) + quest.kr);
+  c.earnedTotal = r2(c.earnedTotal + quest.kr);
   c.counts[quest.title] = (c.counts[quest.title] || 0) + 1;
   var g = false, gm = 0, gHit = false, pf = false;
   if (c.goal && c.goal.on && !c.goal.reached && s >= (c.goal.start || '')) {
@@ -146,8 +156,8 @@ export function approve(child, quest, s, home) {
 export function undo(child, e) {
   var c = JSON.parse(JSON.stringify(child));
   c.xpTotal = Math.max(0, c.xpTotal - e.xp);
-  c.owed[e.home] = Math.max(0, (c.owed[e.home] || 0) - e.kr);
-  c.earnedTotal = Math.max(0, c.earnedTotal - e.kr);
+  c.owed[e.home] = Math.max(0, r2((c.owed[e.home] || 0) - e.kr));
+  c.earnedTotal = Math.max(0, r2(c.earnedTotal - e.kr));
   c.approved = Math.max(0, c.approved - 1);
   c.coins = Math.max(0, c.coins - Math.ceil(e.xp / 2));
   if (c.counts[e.title]) c.counts[e.title] = Math.max(0, c.counts[e.title] - 1);
@@ -162,8 +172,8 @@ export function undo(child, e) {
 
 export function payout(child, home, amount) {
   var c = JSON.parse(JSON.stringify(child));
-  c.owed[home] = Math.max(0, (c.owed[home] || 0) - amount);
-  c.paidTotal += amount;
+  c.owed[home] = Math.max(0, r2((c.owed[home] || 0) - amount));
+  c.paidTotal = r2(c.paidTotal + amount);
   return c;
 }
 

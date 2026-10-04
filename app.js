@@ -22,6 +22,7 @@ const homeName = h => (fam().homeNames && fam().homeNames[h]) || (h === 'a' ? 'H
 const splitOn = () => !!(fam().split && fam().split.on);
 const myName = () => (S.profile && S.profile.name) || '';
 const homeVisible = q => !splitOn() || !q.home || q.home === 'both' || q.home === curHome();
+const kr = n => (Math.round((+n || 0) * 100) / 100).toLocaleString('nb-NO', { maximumFractionDigits: 2 });
 const fmt = at => new Date(at).toLocaleString('nb-NO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 const fmtDay = at => new Date(at).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' });
 const get = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
@@ -153,6 +154,7 @@ function helpView() {
     t('Hver dag', 'Åpne Kontroll. Godkjenn eller send tilbake det barnet har meldt som ferdig. Godkjenn bare når det faktisk er gjort.') +
     t('Quests', 'Her legger du inn oppgaver. Tommelfingerregel: 10 minutter er 10 XP. Storjobb er den store oppgaven som vises øverst hos barnet.') +
     t('kr, XP og mynter', 'kr er ekte penger dere betaler ut. XP gir barnet høyere nivå. Mynter kjøper utseende i appen. Bare kr har med lommebok å gjøre.') +
+    t('Betaling per stykk', 'For jobber som vedkubber eller hundebæsj kan du sette en enhet og pris per stykk (for eksempel 0,5 kr per kubbe). Barnet skriver antall, og du kan rette det når du godkjenner. På andre quests kan du også endre beløpet når du godkjenner.') +
     t('Lønn', 'Viser hva barnet har til gode. Betal selv (for eksempel Vipps) og trykk «Utbetalt».') +
     t('Feil godkjenning?', 'Trykk Angre under Lønn, så trekkes kr og XP tilbake.') +
     t('Familie', 'Koder til barn og andre voksne, delt bosted, ukemål og langtidsmål, for eksempel en tur.') +
@@ -171,7 +173,7 @@ function helpView() {
 
 function sheetView() {
   const seen = S.prevSeen, list = myNotifs().slice(0, 25);
-  const txt = n => n.type === 'done' ? esc(n.from) + ' er ferdig med «' + esc(n.text) + '». Venter på deg.' : n.type === 'approved' ? '«' + esc(n.text) + '» er godkjent. +' + (n.payload ? n.payload.kr : 0) + ' kr, +' + (n.payload ? n.payload.xp : 0) + ' XP' : n.type === 'msg' ? esc(n.from) + ': ' + esc(n.text) : esc(n.text);
+  const txt = n => n.type === 'done' ? esc(n.from) + ' er ferdig med «' + esc(n.text) + '». Venter på deg.' : n.type === 'approved' ? '«' + esc(n.text) + '» er godkjent. +' + kr(n.payload ? n.payload.kr : 0) + ' kr, +' + (n.payload ? n.payload.xp : 0) + ' XP' : n.type === 'msg' ? esc(n.from) + ': ' + esc(n.text) : esc(n.text);
   return '<div class="overlay sheet" data-a="closesheet"><div class="ovb" data-stop="1"><div class="row"><h1 class="grow" style="font-size:22px">Varsler</h1><button class="btn sm ghost" data-a="closesheet">Lukk</button></div>' +
     (list.length ? list.map(n => '<div class="notif' + (n.at > seen ? ' new' : '') + '"><div>' + txt(n) + '</div><div class="st">' + fmt(n.at) + '</div></div>').join('') : '<div class="empty">Ingen varsler ennå.</div>') +
     '<div class="st" style="margin-top:10px">Varsler vises når du åpner appen. Appen sender ikke push-varsler til lukket telefon.</div></div></div>';
@@ -193,11 +195,11 @@ function qcard(q, mine) {
   const cls = 'q' + (s === 'wait' ? ' wait' : '') + (s === 'back' ? ' back' : '') + (s === 'done' ? ' done' : '');
   let act = '', st = '';
   if (s === 'open' || s === 'back') act = '<button class="btn sm" data-a="take" data-id="' + q.id + '">Ta quest</button>';
-  if (s === 'taken') { act = '<button class="btn sm ok" data-a="done" data-id="' + q.id + '">Ferdig</button>'; st = '<div class="st">Pågår</div>'; }
-  if (s === 'wait') st = '<div class="st">Venter på godkjenning</div>';
+  if (s === 'taken') { act = q.unit ? '<div class="cnt"><input id="cnt-' + q.id + '" type="number" min="1" max="500" inputmode="numeric" placeholder="Antall" aria-label="Antall ' + esc(q.unit) + '"><button class="btn sm ok" data-a="done" data-id="' + q.id + '">Ferdig</button></div>' : '<button class="btn sm ok" data-a="done" data-id="' + q.id + '">Ferdig</button>'; st = '<div class="st">' + (q.unit ? 'Skriv hvor mange ' + esc(q.unit) + ' du har gjort, så trykk Ferdig' : 'Pågår') + '</div>'; }
+  if (s === 'wait') st = '<div class="st">Venter på godkjenning' + (q.unit && q.cnt ? ' (' + q.cnt + ' ' + esc(q.unit) + ')' : '') + '</div>';
   if (s === 'done') st = '<div class="st">Ferdig ' + (q.rep === 'Én gang' ? '' : 'for denne perioden') + '</div>';
   if (s === 'back') st = '<div class="st" style="color:var(--bad)">' + esc(q.msg || 'Prøv igjen') + '</div>';
-  return '<div class="' + cls + '"><div class="ico">' + ico(q.ic) + '</div><div class="grow"><div class="t">' + esc(q.title) + '</div><div class="rw"><span class="kr">+' + q.kr + ' kr</span><span class="xp">+' + q.xp + ' XP</span></div>' + st + '</div>' + act + '</div>';
+  return '<div class="' + cls + '"><div class="ico">' + ico(q.ic) + '</div><div class="grow"><div class="t">' + esc(q.title) + '</div><div class="rw"><span class="kr">+' + kr(q.kr) + ' kr' + (q.unit ? ' per ' + esc(q.unit) : '') + '</span><span class="xp">+' + kr(q.xp) + ' XP' + (q.unit ? ' per ' + esc(q.unit) : '') + '</span></div>' + st + '</div>' + act + '</div>';
 }
 function myQuests() { const c = myChild(); if (!c) return []; return S.data.quests.filter(q => q.childId === c.id && homeVisible(q)); }
 
@@ -237,17 +239,17 @@ function kHome() {
   if (!c) return '<div class="empty">Fant ikke profilen din. Be en forelder sjekke at koden din er riktig.</div>';
   const qs = myQuests(), open = q => ['open', 'back', 'taken'].indexOf(L.qState(q)) >= 0;
   const boss = qs.filter(q => q.boss && open(q))[0];
-  const free = qs.filter(q => !q.boss && q.xp <= 15 && ['open', 'back'].indexOf(L.qState(q)) >= 0).slice(0, 2);
+  const free = qs.filter(q => !q.boss && !q.unit && q.xp <= 15 && ['open', 'back'].indexOf(L.qState(q)) >= 0).slice(0, 2);
   const w = L.weekView(c), owed = (c.owed.a || 0) + (c.owed.b || 0);
   const msg = myNotifs().filter(n => n.type === 'msg')[0];
   const doy = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 864e5);
   let h = profileCard(c) + (S.profile && S.data.children[S.profile.childId] && !c.avDone && c.inv.length <= 3 && !c.coins ? '' : '') +
-    '<div class="chips"><div class="chip"><div class="l">' + ico('coin') + 'Til gode</div><div class="v" style="color:var(--money)">' + owed + ' kr</div></div>' +
+    '<div class="chips"><div class="chip"><div class="l">' + ico('coin') + 'Til gode</div><div class="v" style="color:var(--money)">' + kr(owed) + ' kr</div></div>' +
     '<div class="chip"><div class="l">' + ico('flame') + 'Dager på rad</div><div class="v">' + c.streak + '</div></div>' +
     '<div class="chip"><div class="l">' + ico('gift') + 'Til neste kiste</div><div class="v">' + (c.approved % 3) + ' av 3</div></div></div>' +
     '<div class="mom"><div class="av">' + (msg ? esc(msg.from.charAt(0).toUpperCase()) : 'M') + '</div><div class="bubble">' + esc(msg ? msg.text : NPC[doy % NPC.length]) + '</div></div>';
   if (splitOn()) h += '<div class="st" style="margin-top:12px">Denne uka: ' + esc(homeName(curHome())) + '</div>';
-  if (boss) h += '<h2>Dagens storjobb</h2><div class="hero"><div class="tag">Størst jobb akkurat nå</div><div class="ht">' + esc(boss.title) + '</div><div class="rw" style="margin-bottom:14px"><span class="kr">+' + boss.kr + ' kr</span><span class="xp">+' + boss.xp + ' XP</span></div>' + (L.qState(boss) === 'taken' ? '<button class="btn ok" data-a="done" data-id="' + boss.id + '">Ferdig</button>' : '<button class="btn" data-a="take" data-id="' + boss.id + '">Ta storjobben</button>') + '</div>';
+  if (boss) h += '<h2>Dagens storjobb</h2><div class="hero"><div class="tag">Størst jobb akkurat nå</div><div class="ht">' + esc(boss.title) + '</div><div class="rw" style="margin-bottom:14px"><span class="kr">+' + kr(boss.kr) + ' kr</span><span class="xp">+' + boss.xp + ' XP</span></div>' + (L.qState(boss) === 'taken' ? '<button class="btn ok" data-a="done" data-id="' + boss.id + '">Ferdig</button>' : '<button class="btn" data-a="take" data-id="' + boss.id + '">Ta storjobben</button>') + '</div>';
   if (free.length) h += '<h2>Raske jobber</h2>' + free.map(q => qcard(q)).join('');
   if (c.goal && c.goal.on) h += '<h2>Det store målet</h2>' + goalBlock(c, false);
   h += '<h2>Ukens mål</h2><div class="card"><div class="row"><div class="grow">' + w.done + ' av ' + c.weekGoal + ' quests</div><div class="st">Mål nådd = ekstra kiste</div></div><div class="bar2"><i style="width:' + Math.min(100, w.done / c.weekGoal * 100) + '%"></i></div></div>';
@@ -303,8 +305,8 @@ function aHome() {
     h += '<div class="card goal"><div class="st"><b>' + esc(c.name) + ' har ikke logget inn ennå</b></div><div class="st" style="margin:8px 0">Steg 2 av 3: Gi koden til ' + esc(c.name) + '. Barnet åpner appen, trykker «Jeg er barn og har en kode», skriver koden og velger et passord.</div><span class="code">' + esc(c.code || '') + '</span><div class="two" style="margin-top:12px"><button class="btn sm" style="width:100%" data-a="share" data-c="' + c.id + '">Del invitasjon</button><button class="btn sm ghost" style="width:100%" data-a="newcode" data-c="' + c.id + '">Ny kode</button></div>' + (S.data.quests.some(q => q.childId === c.id) ? '' : '<div class="st" style="margin-top:12px"><b>Steg 3 av 3:</b> Legg inn quests under Quests-fanen. Der finnes en ferdig pakke med forslag.</div>') + '</div>';
   });
   h += '<h2>Venter på deg</h2>';
-  h += pend.length ? pend.map(q => { const c = S.data.children[q.childId]; return '<div class="card"><div class="row"><div class="q" style="margin:0;padding:0;background:none"><div class="ico">' + ico(q.ic) + '</div></div><div class="grow"><div class="t" style="font-weight:700">' + esc(q.title) + '</div><div class="st">' + esc(c ? c.name : '') + ' · +' + q.kr + ' kr · +' + q.xp + ' XP' + (splitOn() ? ' · ' + esc(homeName(qHome(q))) : '') + '</div></div></div>' +
-    '<label class="field" style="margin:12px 0 0"><span>Melding hvis du sender tilbake (valgfri)</span><input id="rm-' + q.id + '" maxlength="80"></label><div class="two" style="margin-top:10px"><button class="btn sm ghost" style="width:100%" data-a="reject" data-id="' + q.id + '">Send tilbake</button><button class="btn sm ok" style="width:100%" data-a="approve" data-id="' + q.id + '">Godkjenn</button></div></div>'; }).join('') : '<div class="empty">Ingenting å godkjenne akkurat nå.</div>';
+  h += pend.length ? pend.map(q => { const c = S.data.children[q.childId]; return '<div class="card"><div class="row"><div class="q" style="margin:0;padding:0;background:none"><div class="ico">' + ico(q.ic) + '</div></div><div class="grow"><div class="t" style="font-weight:700">' + esc(q.title) + '</div><div class="st">' + esc(c ? c.name : '') + (q.unit ? ' · ' + (q.cnt ? q.cnt + ' ' + esc(q.unit) : 'antall ikke oppgitt') : ' · +' + kr(q.kr) + ' kr · +' + kr(q.xp) + ' XP') + (splitOn() ? ' · ' + esc(homeName(qHome(q))) : '') + '</div></div></div>' +
+    (q.unit ? '<label class="field" style="margin:12px 0 0"><span>Antall ' + esc(q.unit) + ' (barnet oppga ' + (q.cnt || '?') + '). Pris: ' + kr(q.kr) + ' kr per ' + esc(q.unit) + '</span><input id="ap-' + q.id + '" type="number" min="1" max="500" value="' + (q.cnt || 1) + '"></label>' : '<label class="field" style="margin:12px 0 0"><span>Beløp i kr. Endre hvis det ble mer eller mindre enn vanlig</span><input id="ap-' + q.id + '" type="number" min="0" step="0.5" value="' + q.kr + '"></label>') + '<label class="field" style="margin:12px 0 0"><span>Melding hvis du sender tilbake (valgfri)</span><input id="rm-' + q.id + '" maxlength="80"></label><div class="two" style="margin-top:10px"><button class="btn sm ghost" style="width:100%" data-a="reject" data-id="' + q.id + '">Send tilbake</button><button class="btn sm ok" style="width:100%" data-a="approve" data-id="' + q.id + '">Godkjenn</button></div></div>'; }).join('') : '<div class="empty">Ingenting å godkjenne akkurat nå.</div>';
   if (splitOn()) h += '<div class="st" style="margin-top:14px">Denne uka: ' + esc(homeName(curHome())) + '</div>';
   ks.forEach(c => {
     const p = L.progress(c.xpTotal), w = L.weekView(c);
@@ -321,7 +323,7 @@ function aQuests() {
   let h = '<h2>Quests</h2><button class="btn" data-a="newquest">Ny quest</button>';
   ks.forEach(c => {
     const qs = S.data.quests.filter(q => q.childId === c.id);
-    h += '<h2>' + esc(c.name) + '</h2>' + (qs.length ? qs.map(q => '<div class="q"><div class="ico">' + ico(q.ic) + '</div><div class="grow"><div class="t">' + esc(q.title) + (q.boss ? ' · storjobb' : '') + '</div><div class="st">' + q.rep + ' · ' + q.kr + ' kr · ' + q.xp + ' XP' + (splitOn() && q.home && q.home !== 'both' ? ' · ' + esc(homeName(q.home)) : '') + '</div></div>' +
+    h += '<h2>' + esc(c.name) + '</h2>' + (qs.length ? qs.map(q => '<div class="q"><div class="ico">' + ico(q.ic) + '</div><div class="grow"><div class="t">' + esc(q.title) + (q.boss ? ' · storjobb' : '') + '</div><div class="st">' + q.rep + ' · ' + kr(q.kr) + ' kr' + (q.unit ? ' per ' + esc(q.unit) : '') + ' · ' + kr(q.xp) + ' XP' + (q.unit ? ' per ' + esc(q.unit) : '') + (splitOn() && q.home && q.home !== 'both' ? ' · ' + esc(homeName(q.home)) : '') + '</div></div>' +
       '<button class="btn sm ghost" data-a="editquest" data-id="' + q.id + '" aria-label="Rediger ' + esc(q.title) + '">Endre</button>' +
       (S.confirm === 'del:' + q.id ? '<button class="btn sm danger" data-a="delquest" data-id="' + q.id + '">Sikker?</button>' : '<button class="btn sm ghost" data-a="delquest" data-id="' + q.id + '" aria-label="Slett ' + esc(q.title) + '">' + ico('trash') + '</button>') + '</div>').join('') : '<div class="empty">Ingen quests ennå.</div><button class="btn ghost" data-a="pack" data-c="' + c.id + '">Legg inn forslagspakke (7 vanlige quests)</button>');
   });
@@ -332,8 +334,10 @@ function questForm() {
   return '<h2>' + (f.id ? 'Endre quest' : 'Ny quest') + '</h2>' +
     (f.id ? '' : '<div class="st" style="margin-bottom:6px">Ferdige forslag</div><div class="seg" style="margin-bottom:12px">' + L.TEMPLATES.map((t, i) => '<button data-a="tpl" data-i="' + i + '">' + esc(t.title) + '</button>').join('') + '</div>') +
     '<div class="card"><label class="field"><span>Tittel</span><input id="q-title" value="' + esc(f.title) + '" maxlength="40"></label>' +
-    '<div class="two"><label class="field"><span>Belønning (kr)</span><input id="q-kr" type="number" min="0" max="1000" value="' + f.kr + '"></label><label class="field"><span>XP</span><input id="q-xp" type="number" min="0" max="500" value="' + f.xp + '"></label></div>' +
+    '<div class="two"><label class="field"><span>Belønning (kr)</span><input id="q-kr" type="number" min="0" max="1000" step="0.1" value="' + f.kr + '"></label><label class="field"><span>XP</span><input id="q-xp" type="number" min="0" max="500" value="' + f.xp + '"></label></div>' +
     '<div class="st" style="margin:-4px 0 12px">Tommelfingerregel: 10 min = 10 XP, 30 min = 40 XP.</div>' +
+    '<label class="field"><span>Betales per stykk? Skriv enheten (for eksempel kubbe eller bæsj). La stå tom for en vanlig quest.</span><input id="q-unit" maxlength="12" value="' + esc(f.unit || '') + '" placeholder="kubbe"></label>' +
+    '<div class="st" style="margin:-4px 0 12px">Ved «per stykk» er beløpet og XP-en over prisen for ett stykk, for eksempel 0,5 kr per kubbe. Barnet skriver antall, og du kan rette det før du godkjenner.</div>' +
     '<label class="field"><span>Gjentakelse</span><select id="q-rep">' + ['Daglig', 'Ukentlig', 'Månedlig', 'Én gang'].map(r => '<option' + (f.rep === r ? ' selected' : '') + '>' + r + '</option>').join('') + '</select></label>' +
     (f.id ? '' : '<label class="field"><span>Til</span><select id="q-child">' + (ks.length > 1 ? '<option value="all">Alle barn</option>' : '') + ks.map(c => '<option value="' + c.id + '"' + (f.childId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></label>') +
     (splitOn() ? '<label class="field"><span>Hvilket hjem</span><select id="q-home"><option value="both"' + (f.home === 'both' ? ' selected' : '') + '>Begge</option><option value="a"' + (f.home === 'a' ? ' selected' : '') + '>' + esc(homeName('a')) + '</option><option value="b"' + (f.home === 'b' ? ' selected' : '') + '>' + esc(homeName('b')) + '</option></select></label>' : '') +
@@ -348,10 +352,10 @@ function aPay() {
   ks.forEach(c => {
     h += '<h2>' + esc(c.name) + '</h2><div class="card">';
     const homes = splitOn() ? ['a', 'b'] : ['a'];
-    homes.forEach(hm => { const v = c.owed[hm] || 0; h += '<div class="row" style="margin-bottom:10px"><div class="grow"><div class="st">' + (splitOn() ? esc(homeName(hm)) + ' skylder' : 'Opptjent og ikke utbetalt') + '</div><div class="big-n" style="font-size:34px">' + v + ' kr</div></div><button class="btn ok sm" data-a="pay" data-c="' + c.id + '" data-h="' + hm + '" ' + (v ? '' : 'disabled') + '>Utbetalt</button></div>'; });
-    h += '<div class="st">Appen flytter ikke penger. Betal selv (for eksempel med Vipps) og trykk «Utbetalt» så saldoen nullstilles. Totalt utbetalt: ' + c.paidTotal + ' kr.</div></div>';
+    homes.forEach(hm => { const v = c.owed[hm] || 0; h += '<div class="row" style="margin-bottom:10px"><div class="grow"><div class="st">' + (splitOn() ? esc(homeName(hm)) + ' skylder' : 'Opptjent og ikke utbetalt') + '</div><div class="big-n" style="font-size:34px">' + kr(v) + ' kr</div></div><button class="btn ok sm" data-a="pay" data-c="' + c.id + '" data-h="' + hm + '" ' + (v ? '' : 'disabled') + '>Utbetalt</button></div>'; });
+    h += '<div class="st">Appen flytter ikke penger. Betal selv (for eksempel med Vipps) og trykk «Utbetalt» så saldoen nullstilles. Totalt utbetalt: ' + kr(c.paidTotal) + ' kr.</div></div>';
   });
-  h += '<h2>Historikk</h2>' + (S.data.ledger.length ? S.data.ledger.slice(0, 25).map(e => '<div class="hist' + (e.undone ? ' undone' : '') + '"><div class="grow"><div>' + (e.type === 'payout' ? 'Utbetalt til ' + esc(e.childName) : esc(e.childName) + ' · ' + esc(e.title)) + '</div><div class="st">' + fmtDay(e.at) + ' · ' + esc(e.by) + (splitOn() ? ' · ' + esc(homeName(e.home)) : '') + '</div></div><div>' + (e.type === 'payout' ? '−' : '+') + e.kr + ' kr</div>' + (e.type === 'quest' && !e.undone ? '<button class="btn sm ghost" data-a="undo" data-id="' + e.id + '">Angre</button>' : '') + '</div>').join('') : '<div class="empty">Ingenting ennå.</div>');
+  h += '<h2>Historikk</h2>' + (S.data.ledger.length ? S.data.ledger.slice(0, 25).map(e => '<div class="hist' + (e.undone ? ' undone' : '') + '"><div class="grow"><div>' + (e.type === 'payout' ? 'Utbetalt til ' + esc(e.childName) : esc(e.childName) + ' · ' + esc(e.title)) + '</div><div class="st">' + fmtDay(e.at) + ' · ' + esc(e.by) + (splitOn() ? ' · ' + esc(homeName(e.home)) : '') + '</div></div><div>' + (e.type === 'payout' ? '−' : '+') + kr(e.kr) + ' kr</div>' + (e.type === 'quest' && !e.undone ? '<button class="btn sm ghost" data-a="undo" data-id="' + e.id + '">Angre</button>' : '') + '</div>').join('') : '<div class="empty">Ingenting ennå.</div>');
   return h;
 }
 function aFam() {
@@ -398,7 +402,7 @@ function checkCelebrate() {
   const p = next.payload || { kr: 0, xp: 0 };
   jingle(p.lvlUp ? [523, 659, 784, 1047] : [523, 659, 784]); vib(p.lvlUp ? [60, 40, 120] : 30);
   showOv('<div class="ov-big pop">' + (p.lvlUp ? 'Level ' + p.lvl : 'Godkjent') + '</div><div class="ov-sub">' + esc(p.lvlUp ? 'Rolig nå. Du går forbi alle.' : OK[Math.floor(Math.random() * OK.length)]) + '</div>' +
-    '<div class="ov-card pop"><div class="n" style="color:var(--money)">+' + p.kr + ' kr</div><div class="n" style="color:var(--xp)">+' + p.xp + ' XP</div>' + (p.perfect ? '<div class="st" style="margin-top:8px">Ukemål nådd: ekstra kiste</div>' : '') + (p.goalHit ? '<div class="st" style="margin-top:8px"><b>Stort mål nådd!</b> ' + esc((myChild().goal && myChild().goal.prize) || '') + '</div>' : p.gm ? '<div class="st" style="margin-top:8px">' + p.gm + ' % av det store målet</div>' : '') + ((p.chests || []).length ? '<div class="st" style="margin-top:8px">Ny kiste: ' + esc(p.chests.join(', ')) + '</div>' : '') + '</div>');
+    '<div class="ov-card pop"><div class="n" style="color:var(--money)">+' + kr(p.kr) + ' kr</div><div class="n" style="color:var(--xp)">+' + p.xp + ' XP</div>' + (p.perfect ? '<div class="st" style="margin-top:8px">Ukemål nådd: ekstra kiste</div>' : '') + (p.goalHit ? '<div class="st" style="margin-top:8px"><b>Stort mål nådd!</b> ' + esc((myChild().goal && myChild().goal.prize) || '') + '</div>' : p.gm ? '<div class="st" style="margin-top:8px">' + p.gm + ' % av det store målet</div>' : '') + ((p.chests || []).length ? '<div class="st" style="margin-top:8px">Ny kiste: ' + esc(p.chests.join(', ')) + '</div>' : '') + '</div>');
 }
 
 /* ---------- handlinger ---------- */
@@ -458,7 +462,7 @@ async function doAddChild() {
   await run(async () => { const r = await store.addChild(fid(), { name }); toast('Lagt til. Koden til ' + name + ' er ' + r.code); });
 }
 function readForm() {
-  return { title: $('#q-title').value.trim(), kr: Math.max(0, +$('#q-kr').value || 0), xp: Math.max(0, +$('#q-xp').value || 0), rep: $('#q-rep').value, ic: $('#q-ic').value, boss: $('#q-boss').checked, childId: $('#q-child') ? $('#q-child').value : S.form.childId, home: $('#q-home') ? $('#q-home').value : (S.form.home || 'both') };
+  return { title: $('#q-title').value.trim(), kr: Math.round(Math.max(0, +$('#q-kr').value || 0) * 100) / 100, xp: Math.round(Math.max(0, +$('#q-xp').value || 0) * 100) / 100, unit: $('#q-unit') ? $('#q-unit').value.trim().slice(0, 12) : '', rep: $('#q-rep').value, ic: $('#q-ic').value, boss: $('#q-boss').checked, childId: $('#q-child') ? $('#q-child').value : S.form.childId, home: $('#q-home') ? $('#q-home').value : (S.form.home || 'both') };
 }
 async function onField(f, t) {
   const F = fid();
@@ -499,7 +503,7 @@ async function act(a, el, ev) {
     case 'resetdemo': store.resetDemo(); S.profile = await store.getProfile(); S.tab = 'a-home'; render(); break;
     /* barn */
     case 'take': await run(() => store.setQuestState(F, id, { st: 'taken', by: S.profile.childId })); beep(520, .1, 'square'); break;
-    case 'done': await run(async () => { const q = questById(id); await store.setQuestState(F, id, { st: 'wait', by: S.profile.childId }); await store.addNotif(F, { type: 'done', to: 'adults', from: myChild().name, text: q.title }); }, 'Sendt til godkjenning'); beep(660, .15); break;
+    case 'done': await run(async () => { const q = questById(id); let cnt = null; if (q.unit) { const inp = $('#cnt-' + id); cnt = Math.round(+(inp && inp.value)); if (!(cnt >= 1 && cnt <= 500)) { toast('Skriv hvor mange ' + q.unit + ' du har gjort'); return; } } await store.setQuestState(F, id, Object.assign({ st: 'wait', by: S.profile.childId }, cnt ? { cnt } : {})); await store.addNotif(F, { type: 'done', to: 'adults', from: myChild().name, text: q.unit ? q.title + ' (' + cnt + ' ' + q.unit + ')' : q.title }); }, 'Sendt til godkjenning'); beep(660, .15); break;
     case 'openchest': await run(async () => {
       const c = myChild(), i = +el.dataset.i, type = c.chests[i]; if (!type) return;
       const r = L.rollChest(type, c.inv), patch = { chests: c.chests.filter((_, k) => k !== i) };
@@ -522,13 +526,13 @@ async function act(a, el, ev) {
     case 'buy': { const c = myChild(), it = ITEMBY[id], p = PRICE[it.rar]; if (c.coins < p) { toast('Du trenger ' + (p - c.coins) + ' mynter til'); break; } await run(() => setAvatar(Object.assign({ inv: c.inv.concat([id]), coins: c.coins - p }, it.hc ? { av: Object.assign({}, c.av, { hc: it.hc }) } : {})), it.n + ' er din'); jingle([523, 784]); break; }
     case 'title': await run(() => setAvatar({ title: v })); break;
     /* voksne */
-    case 'approve': await run(async () => { const q = questById(id); await store.approveQuest(F, id, { name: myName(), home: qHome(q) }); }, 'Godkjent'); jingle([523, 659]); break;
+    case 'approve': await run(async () => { const q = questById(id), inp = $('#ap-' + id), v = inp ? +inp.value : NaN, who = { name: myName(), home: qHome(q) }; if (q.unit) { if (!(v >= 1 && v <= 500)) { toast('Skriv antall'); return; } who.cnt = Math.round(v); } else if (isFinite(v) && v >= 0 && v !== q.kr) who.kr = v; await store.approveQuest(F, id, who); }, 'Godkjent'); jingle([523, 659]); break;
     case 'reject': await run(async () => { const q = questById(id), inp = $('#rm-' + id), m = (inp && inp.value.trim()) || BACK[Math.floor(Math.random() * BACK.length)]; await store.setQuestState(F, id, { st: 'back', msg: m }); await store.addNotif(F, { type: 'back', to: q.childId, from: myName(), text: '«' + q.title + '» ble sendt tilbake: ' + m }); }, 'Sendt tilbake'); break;
     case 'quickmsg': await run(() => store.addNotif(F, { type: 'msg', to: el.dataset.c, from: myName(), text: el.dataset.m }), 'Sendt'); break;
     case 'sendmsg': { const inp = $('#msg-' + el.dataset.c), m = inp && inp.value.trim(); if (!m) break; await run(() => store.addNotif(F, { type: 'msg', to: el.dataset.c, from: myName(), text: m }), 'Sendt'); inp.value = ''; break; }
-    case 'newquest': S.form = { title: '', kr: 20, xp: 30, rep: 'Ukentlig', ic: 'spark', boss: false, childId: kids()[0].id, home: 'both' }; render(); break;
-    case 'editquest': { const q = questById(id); S.form = { id: q.id, title: q.title, kr: q.kr, xp: q.xp, rep: q.rep, ic: q.ic, boss: !!q.boss, childId: q.childId, home: q.home || 'both' }; render(); break; }
-    case 'tpl': { const t = L.TEMPLATES[+el.dataset.i], cur = readForm(); S.form = Object.assign({}, S.form, cur, { title: t.title, kr: t.kr, xp: t.xp, rep: t.rep, ic: t.ic, boss: !!t.boss }); render(); break; }
+    case 'newquest': S.form = { title: '', unit: '', kr: 20, xp: 30, rep: 'Ukentlig', ic: 'spark', boss: false, childId: kids()[0].id, home: 'both' }; render(); break;
+    case 'editquest': { const q = questById(id); S.form = { id: q.id, title: q.title, unit: q.unit || '', kr: q.kr, xp: q.xp, rep: q.rep, ic: q.ic, boss: !!q.boss, childId: q.childId, home: q.home || 'both' }; render(); break; }
+    case 'tpl': { const t = L.TEMPLATES[+el.dataset.i], cur = readForm(); S.form = Object.assign({}, S.form, cur, { title: t.title, unit: '', kr: t.kr, xp: t.xp, rep: t.rep, ic: t.ic, boss: !!t.boss }); render(); break; }
     case 'cancelform': S.form = null; render(); break;
     case 'savequest': await run(async () => {
       const f = readForm(); if (!f.title) { toast('Skriv en tittel først'); return; }

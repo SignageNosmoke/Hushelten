@@ -58,11 +58,12 @@ export function createLocalStore() {
       const q = db.quests[qid];
       if (!q || L.qState(q) !== 'wait') throw new Error('not-waiting');
       const s = L.today(), c = db.children[q.childId];
-      const r = L.approve(c, q, s, who.home);
+      const pr = L.priced(q, who.cnt, who.kr);
+      const r = L.approve(c, Object.assign({}, q, { kr: pr.kr, xp: pr.xp }), s, who.home);
       db.children[q.childId] = { ...c, ...r.child };
       q.st = 'done'; q.doneKey = L.cycleKey(q.rep, s);
-      db.ledger[id()] = { at: Date.now(), type: 'quest', childId: q.childId, childName: c.name, title: q.title, kr: q.kr, xp: q.xp, home: who.home, wk: r.info.wk, di: r.info.di, g: r.info.g, pf: r.info.pf, by: who.name, undone: false, qid };
-      db.notifs.push({ id: id(), at: Date.now(), type: 'approved', to: q.childId, from: who.name, text: q.title, payload: r.info });
+      db.ledger[id()] = { at: Date.now(), type: 'quest', childId: q.childId, childName: c.name, title: pr.title, kr: pr.kr, xp: pr.xp, home: who.home, wk: r.info.wk, di: r.info.di, g: r.info.g, pf: r.info.pf, by: who.name, undone: false, qid };
+      db.notifs.push({ id: id(), at: Date.now(), type: 'approved', to: q.childId, from: who.name, text: pr.title, payload: r.info });
       if (r.info.goalHit) db.notifs.push({ id: id(), at: Date.now() + 1, type: 'msg', to: 'adults', from: c.name, text: c.name + ' har nådd målet: ' + ((c.goal && c.goal.prize) || 'målet') });
       save(); return r.info;
     },

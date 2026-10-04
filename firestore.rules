@@ -62,7 +62,7 @@ service cloud.firestore {
         allow create, delete: if isAdult(fid);
         allow update: if isAdult(fid) || (
           isKid(fid, resource.data.childId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['st', 'by'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['st', 'by', 'cnt'])
           && request.resource.data.st in ['open', 'taken', 'wait']
         );
       }
