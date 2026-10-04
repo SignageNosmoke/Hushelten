@@ -146,3 +146,6 @@ h2{font-family:var(--display);font-size:13px;margin:24px 0 10px;font-weight:600;
 
 .cnt{display:flex;gap:6px;align-items:center}
 .cnt input{width:78px;min-height:38px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--fg);padding:6px 10px;font:inherit}
+.perunit{margin:0 0 12px;border:1px dashed var(--line,#d8d4ee);border-radius:12px;padding:8px 12px}
+.perunit summary{cursor:pointer;font-size:.9rem;opacity:.8}
+.perunit[open] summary{margin-bottom:10px}
